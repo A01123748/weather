@@ -13,11 +13,13 @@
     "updates": {
       "fallbackToCacheTimeout": 0
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": false,
+      "bundleIdentifier": "com.efg.weather",
+      "config": {
+        "googleMapsApiKey": "AIzaSyCia1h7V9avmsz0rA0I-rFoFXYmW2lHG9Y"
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
