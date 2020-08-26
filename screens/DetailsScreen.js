@@ -1,4 +1,4 @@
-import React, { useState, useLayoutEffect } from "react";
+import React, { useState, useLayoutEffect, useEffect } from "react";
 import {
   SafeAreaView,
   StatusBar,
@@ -11,14 +11,43 @@ import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import Images from "../components/Images";
 import HeaderButton from "../components/HeaderButton";
 import { HeaderButtons, Item } from "react-navigation-header-buttons";
-import AsyncStorage from "@react-native-community/async-storage";
 import CustomRow from "../components/CustomRow";
+import * as weatherActions from "../store/actions/weather";
+
+Date.prototype.addHours = function (i) {
+  this.setHours(this.getHours() + i);
+  return this;
+};
 
 const DetailsScreen = (props) => {
   const { place } = props.route.params;
+  const { isNew } = props.route.params;
   const [item, setItem] = useState(place);
   const [region, setRegion] = useState(null);
   const [loaded, setLoaded] = useState(false);
+  // Expiration time in hours
+  const expirationTime = 1;
+
+  useEffect(() => {
+    async function refreshData() {
+      if (!isNew) {
+        var date = new Date(item.dt * 1000).addHours(expirationTime);
+        var now = new Date();
+        // console.log("Now: " + now.toLocaleString());
+        // console.log("Date: " + date.toLocaleString());
+        if (date < now) {
+          // console.log("expired");
+          debugger;
+          let updatedItem = await weatherActions.updateItem(item);
+          setItem(updatedItem);
+        } else {
+          //do nothing
+          // console.log("Not expired");
+        }
+      }
+    }
+    refreshData();
+  }, []);
 
   const getRegion = (coord) => {
     try {
@@ -49,13 +78,12 @@ const DetailsScreen = (props) => {
   };
 
   const toggleFavorite = async () => {
-    const value = await AsyncStorage.getItem("weathers");
-    var weathers = JSON.parse(value);
+    var weathers = await weatherActions.getData();
     place.isFavorite = !place.isFavorite;
     setItem(place);
     let index = weathers.findIndex((p) => p.id === item.id);
     weathers[index] = item;
-    AsyncStorage.setItem("weathers", JSON.stringify(weathers));
+    weatherActions.storeData(weathers);
     props.navigation.setOptions({
       headerRight: () => (
         <HeaderButtons HeaderButtonComponent={HeaderButton}>

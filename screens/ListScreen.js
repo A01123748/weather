@@ -8,45 +8,44 @@ import {
   View,
   Text,
 } from "react-native";
-import AsyncStorage from "@react-native-community/async-storage";
 import Card from "../components/Card";
 import { SwipeListView } from "react-native-swipe-list-view";
+import * as weatherActions from "../store/actions/weather";
 
 const ListScreen = (props) => {
   const [data, setData] = useState([]);
-  const [loaded, setLoaded] = useState(false);
-  // debugger;
+  // const [loaded, setLoaded] = useState(false);
+
   const getData = async (props) => {
     try {
-      const value = await AsyncStorage.getItem("weathers");
-      var res = JSON.parse(value);
+      var res = await weatherActions.getData();
       setData(res);
-      setLoaded(true);
+      // setLoaded(true);
       return res;
     } catch (e) {
       console.error(e);
     }
   };
+
   const removeItem = async (item, index) => {
     try {
       let res = data.filter((city) => city.id != item.item.id);
       setData(res);
-      res = JSON.stringify(res);
-      AsyncStorage.setItem("weathers", res);
-      setLoaded(true);
+      weatherActions.storeData(res);
+      // setLoaded(true);
     } catch (e) {
       console.error(e);
     }
   };
+
   useEffect(() => {
     getData();
   });
-  // console.log(temp);
-  if (loaded) {
-    if (data == null || data.length === 0) {
-      // props.navigation.navigate("Search");
-    }
-  }
+  // if (loaded) {
+  //   if (data == null || data.length === 0) {
+  //     // props.navigation.navigate("Search");
+  //   }
+  // }
   const renderItem = ({ item }) => {
     return (
       <Card
@@ -70,7 +69,7 @@ const ListScreen = (props) => {
       </View>
     </TouchableOpacity>
   );
-  // debugger;
+
   const navigation = props.navigation;
   return (
     <SafeAreaView style={styles.container}>
