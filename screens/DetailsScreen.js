@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useLayoutEffect } from "react";
 import {
   SafeAreaView,
   StatusBar,
@@ -8,36 +8,31 @@ import {
   Image,
 } from "react-native";
 import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
-import AsyncStorage from "@react-native-community/async-storage";
 import Images from "../components/Images";
+import HeaderButton from "../components/HeaderButton";
+import { HeaderButtons, Item } from "react-navigation-header-buttons";
+import AsyncStorage from "@react-native-community/async-storage";
+import CustomRow from "../components/CustomRow";
 
-const DetailsScreen = () => {
-  const [selectedId, setSelectedId] = useState(null);
-  const [item, setItem] = useState(null);
+const DetailsScreen = (props) => {
+  const { place } = props.route.params;
+  const [item, setItem] = useState(place);
   const [region, setRegion] = useState(null);
   const [loaded, setLoaded] = useState(false);
-  const getData = async () => {
-    try {
-      const value = await AsyncStorage.getItem("weathers");
-      var res = JSON.parse(value);
-      //   console.log(res);
-      //   debugger;
-      setItem(res[1]);
-      getRegion(res[1]);
-      setLoaded(true);
-    } catch (e) {
-      //   AsyncStorage.setItem("weathers", "");
-      console.error(e);
-    }
-  };
-  const getRegion = (res) => {
+
+  const getRegion = (coord) => {
     try {
       var newRegion = {};
-      if (res !== null) {
-        newRegion.latitude = res.coord.lat;
-        newRegion.longitude = res.coord.lon;
-        newRegion.latitudeDelta = 0.0922;
-        newRegion.longitudeDelta = 0.0421;
+      if (coord !== null) {
+        const oneDegreeOfLongitudeInMeters = 111.32 * 1000;
+        const circumference = (40075 / 360) * 1000;
+        const distance = 5000;
+        const latDelta = distance * (1 / (Math.cos(coord.lat) * circumference));
+        const lonDelta = distance / oneDegreeOfLongitudeInMeters;
+        newRegion.latitude = coord.lat;
+        newRegion.longitude = coord.lon;
+        newRegion.latitudeDelta = Math.max(0, latDelta);
+        newRegion.longitudeDelta = Math.max(0, lonDelta);
       } else {
         newRegion = {
           latitude: 37.78825,
@@ -47,15 +42,49 @@ const DetailsScreen = () => {
         };
       }
       setRegion(newRegion);
-      // debugger;
-      //   setItem(res);
+      setLoaded(true);
     } catch (e) {
       console.error(e);
     }
   };
-  // console.log(temp);
-  if (!loaded) {
-    getData();
+
+  const toggleFavorite = async () => {
+    const value = await AsyncStorage.getItem("weathers");
+    var weathers = JSON.parse(value);
+    place.isFavorite = !place.isFavorite;
+    setItem(place);
+    let index = weathers.findIndex((p) => p.id === item.id);
+    weathers[index] = item;
+    AsyncStorage.setItem("weathers", JSON.stringify(weathers));
+    props.navigation.setOptions({
+      headerRight: () => (
+        <HeaderButtons HeaderButtonComponent={HeaderButton}>
+          <Item
+            title="Favorite"
+            iconName={item.isFavorite ? "ios-star" : "ios-star-outline"}
+            onPress={() => toggleFavorite()}
+          />
+        </HeaderButtons>
+      ),
+    });
+  };
+
+  useLayoutEffect(() => {
+    props.navigation.setOptions({
+      headerRight: () => (
+        <HeaderButtons HeaderButtonComponent={HeaderButton}>
+          <Item
+            title="Favorite"
+            iconName={item.isFavorite ? "ios-star" : "ios-star-outline"}
+            onPress={() => toggleFavorite()}
+          />
+        </HeaderButtons>
+      ),
+    });
+  }, [props.navigation, item, toggleFavorite]);
+
+  if (!loaded && item !== null) {
+    getRegion(item.coord);
   }
   if (item == null || item.size == 0) {
     return (
@@ -75,30 +104,11 @@ const DetailsScreen = () => {
             source={Images.weather[item.weather[0].icon]}
           />
         </View>
-        <View style={styles.labelWrapper}>
-          <Text style={styles.label}>Temperature:</Text>
-          <Text style={styles.rightLabel}>{item.main.temp}°F</Text>
-        </View>
-
-        <View style={styles.labelWrapper}>
-          <Text style={styles.label}>Pressure:</Text>
-          <Text style={styles.rightLabel}>{item.main.pressure}hPa</Text>
-        </View>
-
-        <View style={styles.labelWrapper}>
-          <Text style={styles.label}>Humidity:</Text>
-          <Text style={styles.rightLabel}>{item.main.humidity}%</Text>
-        </View>
-
-        <View style={styles.labelWrapper}>
-          <Text style={styles.label}>Max temp:</Text>
-          <Text style={styles.rightLabel}>{item.main.temp_max}°F</Text>
-        </View>
-
-        <View style={styles.labelWrapper}>
-          <Text style={styles.label}>Min temp:</Text>
-          <Text style={styles.rightLabel}>{item.main.temp_min}°F</Text>
-        </View>
+        <CustomRow name="Temperature" value={`${item.main.temp}°C`} />
+        <CustomRow name="Pressure" value={`${item.main.pressure} hPa`} />
+        <CustomRow name="Humidity" value={`${item.main.humidity}%`} />
+        <CustomRow name="Max temp" value={`${item.main.temp_max}°C`} />
+        <CustomRow name="Min temp" value={`${item.main.temp_min}°C`} />
       </View>
       <MapView region={region} style={styles.map} provider={PROVIDER_GOOGLE}>
         <Marker
@@ -116,12 +126,12 @@ const styles = StyleSheet.create({
     flex: 1,
     marginTop: StatusBar.currentHeight || 0,
     width: "100%",
+    backgroundColor: "white",
   },
   item: {
+    flex: 1,
     padding: 20,
     marginVertical: 8,
-    // marginHorizontal: 16,
-    // alignItems: "stretch",
   },
   img: {
     width: 100,
@@ -140,21 +150,15 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 20,
-    // justifyContent: "space-between",
-    // textAlign: "justify",
-    // backgroundColor: "red",
     width: "50%",
   },
   rightLabel: {
     fontSize: 20,
-    // justifyContent: "space-between",
     textAlign: "right",
-    // backgroundColor: "red",
     width: "50%",
   },
   map: {
     flex: 1,
-    // ...StyleSheet.absoluteFillObject,
   },
 });
 

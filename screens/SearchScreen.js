@@ -1,51 +1,27 @@
 import React, { useState } from "react";
 import {
-  FlatList,
   SafeAreaView,
   StatusBar,
   StyleSheet,
   Text,
-  TouchableOpacity,
   TextInput,
   Button,
 } from "react-native";
 import AsyncStorage from "@react-native-community/async-storage";
 
-const DATA = [];
-//q={City Name} or lat={lat}&lon={lon} or zip={zip code}
+//append q={City Name} at the end to find the city by name
 const baseURL =
   "https://api.openweathermap.org/data/2.5/weather?appid=a0b87be8c0814bd84d71455dd624c89b&units=metric";
 
-const Item = ({ item, onPress, style }) => (
-  <TouchableOpacity onPress={onPress} style={[styles.item, style]}>
-    <Text style={styles.title}>{item.title}</Text>
-  </TouchableOpacity>
-);
-
-const SearchScreen = () => {
-  const [selectedId, setSelectedId] = useState(null);
-  const [value, onChangeText] = React.useState("");
-  const renderItem = ({ item }) => {
-    const backgroundColor = item.id === selectedId ? "#6e3b6e" : "#f9c2ff";
-
-    return (
-      <Item
-        item={item}
-        onPress={() => setSelectedId(item.id)}
-        style={{ backgroundColor }}
-      />
-    );
-  };
+const SearchScreen = (props) => {
+  const [message, setMessage] = useState("");
+  const [value, setValue] = React.useState("");
 
   const search = async (text) => {
     console.log(text);
     var queryParams = "";
     if (text != null) {
-      if (isNaN(text)) {
-        queryParams = "&q=" + text;
-      } else {
-        queryParams = "&zip=" + text;
-      }
+      queryParams = "&q=" + text;
       let response = await fetch(baseURL + queryParams, {
         method: "GET",
         headers: {
@@ -54,18 +30,47 @@ const SearchScreen = () => {
         },
       });
       let json = await response.json();
-      console.log(json);
+      setValue("");
+      setMessage("");
+      //404 means city not found
       if (json.cod !== "404") {
-        debugger;
         const previousWeathers = await getData();
-        if (previousWeathers == null) storeData(JSON.stringify([json]));
-        else {
-          debugger;
-          var output = JSON.parse(previousWeathers);
-          output = output.concat(json);
-          console.log(output);
-          storeData(JSON.stringify(output));
+        //If is the first element
+        if (previousWeathers == null || previousWeathers.length == 0) {
+          storeData(JSON.stringify([json]));
+          props.navigation.replace("Details", { place: json });
         }
+        //If previous elements exist
+        else {
+          var output = JSON.parse(previousWeathers);
+          if (output.findIndex((p) => p.id === json.id) < 0) {
+            //Allow maximum 5 elements
+            if (output.length >= 5) {
+              //Search for deletable elements by search, aka no favorites
+              let indexToRemove = output.findIndex(
+                (p) => p.isFavorite === false
+              );
+              if (indexToRemove != -1) output.splice(indexToRemove, 1);
+            }
+            //Validate that one element was deleted or send error
+            if (output.length >= 5) {
+              setMessage(
+                "Cities limit reached, remove them manually or remove from favorites"
+              );
+            } //Everything is fine, append element to list
+            else {
+              output = output.concat(json);
+              storeData(JSON.stringify(output));
+              props.navigation.replace("Details", { place: json });
+            }
+          } //Avoid duplicates
+          else {
+            setMessage("City already added");
+          }
+        }
+      } else {
+        setMessage(json.message);
+        setValue("");
       }
     }
   };
@@ -89,19 +94,15 @@ const SearchScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text>Search for a place's weather</Text>
+      <Text style={styles.title}>Type a city name:</Text>
       <TextInput
         style={styles.searchBar}
-        onChangeText={(text) => onChangeText(text)}
+        onChangeText={(text) => setValue(text)}
         value={value}
+        textAlign={"center"}
       />
       <Button title="Search" onPress={() => search(value)} />
-      <FlatList
-        data={DATA}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        extraData={selectedId}
-      />
+      <Text style={styles.erroMessage}>{message}</Text>
     </SafeAreaView>
   );
 };
@@ -109,22 +110,29 @@ const SearchScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    flexDirection: "column",
     marginTop: StatusBar.currentHeight || 0,
+    alignItems: "center",
+    backgroundColor: "white",
   },
   item: {
+    flex: 1,
     padding: 20,
     marginVertical: 8,
     marginHorizontal: 16,
   },
   title: {
-    fontSize: 32,
+    fontSize: 24,
   },
   searchBar: {
-    alignSelf: "stretch",
     height: 40,
     borderColor: "gray",
     borderWidth: 1,
     width: 300,
+  },
+  errorMessage: {
+    color: "red",
+    fontSize: 20,
   },
 });
 
